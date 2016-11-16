@@ -32,8 +32,6 @@ Content-Type: text/plain; charset=utf-8
 Date: Wed, 16 Nov 2016 17:01:21 GMT
 
 Your name is: dennis and you are 42 old, foo's message is: FooSingleton - dennis, 42
-
-dennis@MacBook-Pro-van-Dennis ~/projects $
 ```
 
 Have fun!
