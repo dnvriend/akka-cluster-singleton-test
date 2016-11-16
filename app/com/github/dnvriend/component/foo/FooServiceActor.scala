@@ -17,15 +17,29 @@
 package com.github.dnvriend.component.foo
 
 import akka.actor.Actor
+import akka.stream.Materializer
 import com.github.dnvriend.component.foo.FooServiceActor.GetMessage
+import akka.pattern.pipe
+import akka.stream.scaladsl.Source
+
+import scala.concurrent.ExecutionContext
+import scalaz._
+import Scalaz._
 
 object FooServiceActor {
   final case class GetMessage(name: String, age: Int)
 }
 
-class FooServiceActor extends Actor {
+class FooServiceActor(implicit ec: ExecutionContext, mat: Materializer) extends Actor {
+  // we are appending strings so Monoid[String]
+  final val StringMonoid = Monoid[String]
+
   override def receive: Receive = {
     case GetMessage(name, age) =>
-      sender() ! s"FooSingleton - $name, $age"
+      Source.single("FooSingleton")
+        .map(msg => s"$msg - $name, $age")
+        .map(msg => s"$msg - ${java.util.UUID.randomUUID()}")
+        .runFold(StringMonoid.zero)(StringMonoid.append(_, _))
+        .pipeTo(sender())
   }
 }

@@ -18,6 +18,7 @@ package com.github.dnvriend
 
 import akka.actor.{ActorSystem, PoisonPill, Props}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
+import akka.stream.Materializer
 import akka.util.Timeout
 import com.github.dnvriend.component.foo._
 import com.google.inject.{AbstractModule, Provides}
@@ -38,10 +39,10 @@ class Module extends AbstractModule with AkkaGuiceSupport {
 
   @Provides
   @ClusterSingleton
-  def singleFooServiceProvider(system: ActorSystem)(implicit ec: ExecutionContext, timeout: Timeout): FooService = {
+  def singleFooServiceProvider(system: ActorSystem)(implicit ec: ExecutionContext, mat: Materializer, timeout: Timeout): FooService = {
     val fooServiceSingletonMgr = system.actorOf(
       ClusterSingletonManager.props(
-        singletonProps = Props(classOf[FooServiceActor]),
+        singletonProps = Props(classOf[FooServiceActor], ec, mat),
         terminationMessage = PoisonPill,
         settings = ClusterSingletonManagerSettings(system)
       ),
