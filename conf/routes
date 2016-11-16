@@ -1,0 +1,2 @@
+GET     /foo/:name/:age     com.github.dnvriend.component.controller.FooController.getFoo(name: String, age: Int)
+GET     /singlefoo/:name/:age     com.github.dnvriend.component.controller.FooController.getSingleFoo(name: String, age: Int)
