@@ -41,6 +41,8 @@ object ProjectPlugin extends AutoPlugin {
       "com.typesafe.akka" %% "akka-slf4j" % AkkaVersion,
       "ch.qos.logback" % "logback-classic" % "1.1.7",
       "org.scalaz" %% "scalaz-core" % "7.2.7",
+      "net.cakesolutions" %% "scala-kafka-client-akka" % "0.8.0",
+      "net.cakesolutions" %% "scala-kafka-client-testkit" % "0.8.0" % Test,
       "org.mockito" % "mockito-core" % "2.2.12" % Test,
       "com.typesafe.akka" %% "akka-stream-testkit" % AkkaVersion % Test,
       "com.typesafe.akka" %% "akka-testkit" % AkkaVersion % Test,
@@ -51,6 +53,10 @@ object ProjectPlugin extends AutoPlugin {
       "scala" -> Apache2_0("2016", "Dennis Vriend"),
       "java" -> Apache2_0("2016", "Dennis Vriend"),
       "conf" -> Apache2_0("2016", "Dennis Vriend", "#")
+    ),
+
+    resolvers ++= Seq(
+      Resolver.bintrayRepo("cakesolutions", "maven")
     ),
 
     ScalariformKeys.preferences in Compile := formattingPreferences,

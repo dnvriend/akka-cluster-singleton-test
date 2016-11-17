@@ -11,8 +11,11 @@
     </appender>
 
 
-    <logger name="akka" level="debug"/>
-    <logger name="akka.persistence" level="debug"/>
+    <!--<logger name="akka" level="debug"/>-->
+    <!--<logger name="org.apache.kafka" level="debug"/>-->
+    <!--<logger name="cakesolutions.kafka" level="debug"/>-->
+    <!--<logger name="akka.persistence" level="debug"/>-->
+    <logger name="com.github.dnvriend" level="debug"/>
 
     <root level="error">
         <appender-ref ref="console"/>

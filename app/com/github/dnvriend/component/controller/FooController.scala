@@ -19,11 +19,13 @@ package com.github.dnvriend.component.controller
 import javax.inject.Inject
 
 import com.github.dnvriend.component.foo.{ClusterSingleton, Default, FooService}
+import com.github.dnvriend.component.kafka.producer.PersonProducer
+import com.github.dnvriend.component.model.Person
 import play.api.mvc.{Action, Controller}
 
 import scala.concurrent.ExecutionContext
 
-class FooController @Inject() (@Default fooService: FooService, @ClusterSingleton singleFooService: FooService)(implicit ec: ExecutionContext) extends Controller {
+class FooController @Inject() (@Default fooService: FooService, @ClusterSingleton singleFooService: FooService, personProducer: PersonProducer)(implicit ec: ExecutionContext) extends Controller {
   def getFoo(name: String, age: Int) = Action.async {
     fooService.foo(name, age).map { msg =>
       Ok(s"Your name is: $name and you are $age old, foo's message is: $msg")
@@ -33,6 +35,12 @@ class FooController @Inject() (@Default fooService: FooService, @ClusterSingleto
   def getSingleFoo(name: String, age: Int) = Action.async {
     singleFooService.foo(name, age).map { msg =>
       Ok(s"Your name is: $name and you are $age old, foo's message is: $msg")
+    }
+  }
+
+  def publishPerson(name: String, age: Int) = Action.async {
+    personProducer.sendPerson(Person(name, age)).map { data =>
+      Ok(s"Message has been sent: $data")
     }
   }
 }

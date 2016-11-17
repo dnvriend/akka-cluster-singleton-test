@@ -34,4 +34,10 @@ Date: Wed, 16 Nov 2016 17:01:21 GMT
 Your name is: dennis and you are 42 old, foo's message is: FooSingleton - dennis, 42
 ```
 
+## Zookeeper and Kafka
+This project uses [wurstmeister/zookeeper](https://hub.docker.com/r/wurstmeister/zookeeper/) and [wurstmeister/kafka](https://hub.docker.com/r/wurstmeister/kafka/) and is based on the [single-broker](https://github.com/wurstmeister/kafka-docker/blob/master/docker-compose-single-broker.yml)
+configuration.
+
+
+
 Have fun!
