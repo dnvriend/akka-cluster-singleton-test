@@ -16,24 +16,24 @@
 
 package com.github.dnvriend
 
-import javax.inject.Inject
+import java.util.logging.Logger
 
-import akka.actor.{ActorSystem, PoisonPill, Props}
+import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings}
 import akka.serialization.Serializer
 import akka.stream.Materializer
 import akka.util.Timeout
 import cakesolutions.kafka.KafkaProducer.Conf
-import com.github.dnvriend.component.foo._
-import com.github.dnvriend.component.kafka.producer.{DefaultKafkaProducer, KafkaProducer}
-import com.google.inject.{AbstractModule, Provider}
-import org.apache.kafka.common.serialization.{ByteArraySerializer, StringSerializer}
-import play.api.Configuration
 import cakesolutions.kafka.{KafkaConsumer => CakeSolutionsKafkaConsumer, KafkaProducer => CakeSolutionsKafkaProducer}
+import com.github.dnvriend.component.consumer.{KafkaTestTopicConsumerActor, TestTopicConsumer}
+import com.github.dnvriend.component.foo._
 import com.github.dnvriend.component.kafka.annotation.TestTopic
 import com.github.dnvriend.component.kafka.consumer.{DefaultKafkaConsumer, KafkaConsumer}
+import com.github.dnvriend.component.kafka.producer.{DefaultKafkaProducer, KafkaProducer}
 import com.github.dnvriend.component.serializer.PersonSerializer
-import com.github.dnvriend.component.testtopicconsumer.TestTopicConsumer
+import com.google.inject.{AbstractModule, Inject, Provider}
+import org.apache.kafka.common.serialization.{ByteArraySerializer, StringSerializer}
+import play.api.Configuration
 import play.api.libs.concurrent.AkkaGuiceSupport
 
 import scala.concurrent.ExecutionContext
@@ -54,15 +54,19 @@ class Module extends AbstractModule with AkkaGuiceSupport {
       .annotatedWith(classOf[TestTopic])
       .toProvider(classOf[TestTopicKafkaProducerProvider])
 
-    bind(classOf[KafkaConsumer])
-      .annotatedWith(classOf[TestTopic])
-      .toProvider(classOf[TestTopicKafkaConsumerProvider])
+    //    bind(classOf[KafkaConsumer])
+    //      .annotatedWith(classOf[TestTopic])
+    //      .toProvider(classOf[TestTopicKafkaConsumerProvider])
+
+    //    bind(classOf[TestTopicConsumer])
+    //      .asEagerSingleton()
+
+    bind(classOf[ActorRef])
+      .toProvider(classOf[TestTopicKafkaConsumerClusterSingletonProvider])
+      .asEagerSingleton
 
     bind(classOf[Serializer])
       .to(classOf[PersonSerializer])
-
-    bind(classOf[TestTopicConsumer])
-      .asEagerSingleton()
 
     bind(classOf[Timeout])
       .toInstance(Timeout(10.seconds))
@@ -80,6 +84,24 @@ class TestTopicKafkaConsumerProvider @Inject() (config: Configuration, personSer
   override def get(): KafkaConsumer = {
     val kafkaConfig = config.underlying.getConfig("kafka-test")
     new DefaultKafkaConsumer(kafkaConfig, personSerializer, system)
+  }
+}
+
+class TestTopicKafkaConsumerClusterSingletonProvider @Inject() (@ClusterSingleton fooService: FooService, config: Configuration, serializer: PersonSerializer, logger: Logger)(implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer) extends Provider[ActorRef] {
+  override def get(): ActorRef = {
+    val kafkaConfig = config.underlying.getConfig("kafka-test")
+    val clusterSingletonManagerSettings = ClusterSingletonManagerSettings(kafkaConfig.getConfig("singleton"))
+    val clusterSingletonProxySettings = ClusterSingletonProxySettings(kafkaConfig.getConfig("singleton-proxy"))
+    val actorName = "singleton-kafka-test-manager"
+    system.actorOf(
+      ClusterSingletonManager.props(
+        singletonProps = Props(classOf[KafkaTestTopicConsumerActor], fooService, serializer, kafkaConfig, logger, system, ec, mat),
+        terminationMessage = KafkaTestTopicConsumerActor.Terminate,
+        settings = clusterSingletonManagerSettings
+      ),
+      name = actorName
+    )
+    system.actorOf(ClusterSingletonProxy.props(s"/user/$actorName", clusterSingletonProxySettings), "singleton-kafka-test-proxy")
   }
 }
 

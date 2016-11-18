@@ -2,14 +2,11 @@
 A small study project on akka-cluster-singleton.
 
 ## Description
-Project uses the playframework as a quick way to wire components and controllers together using
-the Guice DI framework.
+Project uses the playframework as a quick way to wire components and controllers together using the Guice DI framework.
 
-The project contains a single `FooService` with two implementations, a `DefaultFooService` that can
-be referred to with the `@Default` annotation and a `ClusterSingletonFooService` that can be referred to
-with the `@ClusterSingleton` annotation.
+The project contains a single `FooService` with two implementations, a `DefaultFooService` that can be referred to with the `@Default` annotation and a `ClusterSingletonFooService` that can be referred to with the `@ClusterSingleton` annotation.
 
-## Usage
+## DefaultFooService and ClusterSingletonFooService
 A message can be sent to both services using REST eg:
 
 __DefaultFooService:__
@@ -37,6 +34,9 @@ Your name is: dennis and you are 42 old, foo's message is: FooSingleton - dennis
 ## Zookeeper and Kafka
 This project uses [wurstmeister/zookeeper](https://hub.docker.com/r/wurstmeister/zookeeper/) and [wurstmeister/kafka](https://hub.docker.com/r/wurstmeister/kafka/) and is based on the [single-broker](https://github.com/wurstmeister/kafka-docker/blob/master/docker-compose-single-broker.yml)
 configuration.
+
+## Documentation
+- https://kafka.apache.org/documentation.html#newconsumerconfigs
 
 
 
