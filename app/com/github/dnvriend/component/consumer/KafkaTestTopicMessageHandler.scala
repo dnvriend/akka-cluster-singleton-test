@@ -32,9 +32,9 @@ object KafkaTestTopicMessageHandler {
       .viaMat(KillSwitches.single)(Keep.right)
       .mapAsync(1) {
         case msg @ CommittableConsumerRecord(_, offsets, p @ Person(name, age)) =>
-          println(s"==> [KafkaTestTopicMessageHandler] ==> $p, $offsets")
+          println(s"==> [Singleton - KafkaTestTopicMessageHandler] ==> $p, $offsets")
           fooService.foo(name, age)
-            .map(msg => println(s"==> [KafkaTestTopicMessageHandler] ==> from fooService: $msg"))
+            .map(msg => println(s"==> [Singleton - KafkaTestTopicMessageHandler] ==> from fooService: $msg"))
             .map(_ => msg)
       }
       .toMat(Sink.foreach(_.commit))(Keep.left).run()

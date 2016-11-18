@@ -25,13 +25,13 @@ import akka.stream.Materializer
 import akka.util.Timeout
 import cakesolutions.kafka.KafkaProducer.Conf
 import cakesolutions.kafka.{KafkaConsumer => CakeSolutionsKafkaConsumer, KafkaProducer => CakeSolutionsKafkaProducer}
-import com.github.dnvriend.component.consumer.{KafkaTestTopicConsumerActor, TestTopicConsumer}
+import com.github.dnvriend.component.consumer.{KafkaTestTopicConsumerActor, TestTopicMessageHandler}
 import com.github.dnvriend.component.foo._
 import com.github.dnvriend.component.kafka.annotation.TestTopic
 import com.github.dnvriend.component.kafka.consumer.{DefaultKafkaConsumer, KafkaConsumer}
 import com.github.dnvriend.component.kafka.producer.{DefaultKafkaProducer, KafkaProducer}
 import com.github.dnvriend.component.serializer.PersonSerializer
-import com.google.inject.{AbstractModule, Inject, Provider}
+import com.google.inject.{AbstractModule, Inject, Provider, Provides}
 import org.apache.kafka.common.serialization.{ByteArraySerializer, StringSerializer}
 import play.api.Configuration
 import play.api.libs.concurrent.AkkaGuiceSupport
@@ -41,35 +41,40 @@ import scala.concurrent.duration._
 
 class Module extends AbstractModule with AkkaGuiceSupport {
   override def configure() = {
+    // person serializer
+    bind(classOf[Serializer])
+      .to(classOf[PersonSerializer])
+
+    // akka.util.Timeout for ask pattern
+    bind(classOf[Timeout])
+      .toInstance(Timeout(10.seconds))
+
+    // foo service
     bind(classOf[FooService])
       .annotatedWith(classOf[Default])
       .to(classOf[DefaultFooService])
 
+    // foo service singleton
     bind(classOf[FooService])
       .annotatedWith(classOf[ClusterSingleton])
       .toProvider(classOf[ClusterSingletonFooProvider])
       .asEagerSingleton()
 
+    // kafka producer to topic: test
     bind(classOf[KafkaProducer])
       .annotatedWith(classOf[TestTopic])
       .toProvider(classOf[TestTopicKafkaProducerProvider])
+      .asEagerSingleton()
 
-    //    bind(classOf[KafkaConsumer])
-    //      .annotatedWith(classOf[TestTopic])
-    //      .toProvider(classOf[TestTopicKafkaConsumerProvider])
+    // kafka message handler that consumes topic: test
+    bind(classOf[TestTopicMessageHandler])
+      .toProvider(classOf[TestTopicMessageHandlerProvider])
+      .asEagerSingleton()
 
-    //    bind(classOf[TestTopicConsumer])
-    //      .asEagerSingleton()
-
+    // kafka consumer of topic: test
     bind(classOf[ActorRef])
       .toProvider(classOf[TestTopicKafkaConsumerClusterSingletonProvider])
       .asEagerSingleton
-
-    bind(classOf[Serializer])
-      .to(classOf[PersonSerializer])
-
-    bind(classOf[Timeout])
-      .toInstance(Timeout(10.seconds))
   }
 }
 
@@ -80,16 +85,16 @@ class TestTopicKafkaProducerProvider @Inject() (config: Configuration) extends P
   }
 }
 
-class TestTopicKafkaConsumerProvider @Inject() (config: Configuration, personSerializer: PersonSerializer)(implicit system: ActorSystem) extends Provider[KafkaConsumer] {
-  override def get(): KafkaConsumer = {
+class TestTopicMessageHandlerProvider @Inject() (config: Configuration, personSerializer: PersonSerializer, logger: Logger)(implicit ec: ExecutionContext, system: ActorSystem, mat: Materializer) extends Provider[TestTopicMessageHandler] {
+  override def get(): TestTopicMessageHandler = {
     val kafkaConfig = config.underlying.getConfig("kafka-test")
-    new DefaultKafkaConsumer(kafkaConfig, personSerializer, system)
+    new TestTopicMessageHandler(new DefaultKafkaConsumer(kafkaConfig, personSerializer, system), logger)
   }
 }
 
 class TestTopicKafkaConsumerClusterSingletonProvider @Inject() (@ClusterSingleton fooService: FooService, config: Configuration, serializer: PersonSerializer, logger: Logger)(implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer) extends Provider[ActorRef] {
   override def get(): ActorRef = {
-    val kafkaConfig = config.underlying.getConfig("kafka-test")
+    val kafkaConfig = config.underlying.getConfig("kafka-test-singleton")
     val clusterSingletonManagerSettings = ClusterSingletonManagerSettings(kafkaConfig.getConfig("singleton"))
     val clusterSingletonProxySettings = ClusterSingletonProxySettings(kafkaConfig.getConfig("singleton-proxy"))
     val actorName = "singleton-kafka-test-manager"

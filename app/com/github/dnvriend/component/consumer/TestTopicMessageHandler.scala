@@ -26,12 +26,12 @@ import com.github.dnvriend.component.model.Person
 
 import scala.concurrent.ExecutionContext
 
-class TestTopicConsumer(kafkaConsumer: KafkaConsumer, logger: Logger)(implicit ec: ExecutionContext, system: ActorSystem, mat: Materializer) {
+class TestTopicMessageHandler(kafkaConsumer: KafkaConsumer, logger: Logger)(implicit ec: ExecutionContext, system: ActorSystem, mat: Materializer) {
   kafkaConsumer.source.map {
     case msg @ CommittableConsumerRecord(_, offsets, p @ Person(name, age)) =>
-      println(s"==> [TestTopicConsumer] ==> $p, $offsets")
+      println(s"==> [Non-singleton - TestTopicMessageHandler] ==> $p, $offsets")
       msg.commit
     case msg =>
-      logger.warning("==> Dropping: " + msg)
+      logger.warning("==> [Non-singleton - TestTopicMessageHandler] ==> Dropping: " + msg)
   }.runWith(Sink.ignore)
 }
