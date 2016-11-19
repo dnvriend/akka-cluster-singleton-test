@@ -29,5 +29,5 @@ import akka.stream.scaladsl.Source
  * from the queue.
  */
 trait KafkaConsumer {
-  def source: Source[CommittableConsumerRecord, ActorRef]
+  def source: Source[KafkaConsumerProtocol, ActorRef]
 }

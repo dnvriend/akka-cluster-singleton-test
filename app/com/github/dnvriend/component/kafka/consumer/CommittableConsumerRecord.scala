@@ -19,7 +19,28 @@ package com.github.dnvriend.component.kafka.consumer
 import akka.actor.ActorRef
 import cakesolutions.kafka.akka.{KafkaConsumerActor, Offsets}
 
-final case class CommittableConsumerRecord(kafka: ActorRef, offsets: Offsets, record: AnyRef) {
+trait KafkaConsumerProtocol
+final case class StartBatch(offset: Offsets, length: Long) extends KafkaConsumerProtocol
+
+object EndBatch {
+  def unapply(arg: EndBatch): Option[Offsets] =
+    Option(arg.offsets)
+}
+
+class EndBatch(val kafka: ActorRef, val offsets: Offsets, val batchSize: Long) extends KafkaConsumerProtocol {
+  def commit: Unit = {
+    kafka ! KafkaConsumerActor.Confirm(offsets, commit = true)
+  }
+}
+
+object CommittableConsumerRecord {
+  def unapply(arg: CommittableConsumerRecord): Option[(Any)] =
+    Option(arg.record)
+  def apply(kafka: ActorRef, offsets: Offsets, batchSize: Long, record: Any): CommittableConsumerRecord =
+    new CommittableConsumerRecord(kafka, offsets, batchSize, record)
+}
+
+class CommittableConsumerRecord(val kafka: ActorRef, val offsets: Offsets, val batchSize: Long, val record: Any) extends KafkaConsumerProtocol {
   def commit: Unit = {
     kafka ! KafkaConsumerActor.Confirm(offsets, commit = true)
   }

@@ -21,17 +21,20 @@ import java.util.logging.Logger
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
-import com.github.dnvriend.component.kafka.consumer.{CommittableConsumerRecord, KafkaConsumer}
+import com.github.dnvriend.component.kafka.consumer.{CommittableConsumerRecord, EndBatch, KafkaConsumer}
 import com.github.dnvriend.component.model.Person
 
 import scala.concurrent.ExecutionContext
 
 class TestTopicMessageHandler(kafkaConsumer: KafkaConsumer, logger: Logger)(implicit ec: ExecutionContext, system: ActorSystem, mat: Materializer) {
   kafkaConsumer.source.map {
-    case msg @ CommittableConsumerRecord(_, offsets, p @ Person(name, age)) =>
-      println(s"==> [Non-singleton - TestTopicMessageHandler] ==> $p, $offsets")
-      msg.commit
-    case msg =>
-      logger.warning("==> [Non-singleton - TestTopicMessageHandler] ==> Dropping: " + msg)
-  }.runWith(Sink.ignore)
+    case msg @ CommittableConsumerRecord(Person(name, age)) =>
+      println(s"==> [Non-singleton - TestTopicMessageHandler] ==> ${msg.record}, ${msg.offsets}, batchSize: ${msg.batchSize}")
+    case e => e
+  }.runWith(Sink.foreach {
+    case end: EndBatch =>
+      end.commit
+      println(s"==> [Non-singleton - TestTopicMessageHandler] ==> batch size: ${end.batchSize}")
+    case _ =>
+  })
 }

@@ -19,7 +19,7 @@ package com.github.dnvriend.component.kafka.consumer
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.serialization.Serializer
 import akka.stream.scaladsl.Source
-import cakesolutions.kafka.akka.{KafkaConsumerActor, Offsets}
+import cakesolutions.kafka.akka.KafkaConsumerActor
 import com.typesafe.config.Config
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, StringDeserializer}
 
@@ -54,7 +54,7 @@ class DefaultKafkaConsumer(kafkaClientConf: Config, serializer: Serializer, syst
     )
   }
 
-  override def source: Source[CommittableConsumerRecord, ActorRef] = {
+  override def source: Source[KafkaConsumerProtocol, ActorRef] = {
     Source.actorPublisher(Props(new KafkaConsumerActorPublisher(serializer, createKafkaClient)))
   }
 }

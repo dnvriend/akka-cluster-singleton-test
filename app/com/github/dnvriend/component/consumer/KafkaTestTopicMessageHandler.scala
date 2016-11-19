@@ -21,21 +21,30 @@ import java.util.logging.Logger
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import com.github.dnvriend.component.foo.FooService
-import com.github.dnvriend.component.kafka.consumer.CommittableConsumerRecord
+import com.github.dnvriend.component.kafka.consumer.{CommittableConsumerRecord, EndBatch, KafkaConsumerProtocol}
 import com.github.dnvriend.component.model.Person
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 object KafkaTestTopicMessageHandler {
-  def apply(kafkaEvents: Source[CommittableConsumerRecord, _], fooService: FooService, logger: Logger)(implicit ec: ExecutionContext, mat: Materializer): UniqueKillSwitch =
+  def apply(kafkaEvents: Source[KafkaConsumerProtocol, _], fooService: FooService, logger: Logger)(implicit ec: ExecutionContext, mat: Materializer): UniqueKillSwitch =
     kafkaEvents
       .viaMat(KillSwitches.single)(Keep.right)
       .mapAsync(1) {
-        case msg @ CommittableConsumerRecord(_, offsets, p @ Person(name, age)) =>
-          println(s"==> [Singleton - KafkaTestTopicMessageHandler] ==> $p, $offsets")
-          fooService.foo(name, age)
-            .map(msg => println(s"==> [Singleton - KafkaTestTopicMessageHandler] ==> from fooService: $msg"))
-            .map(_ => msg)
-      }
-      .toMat(Sink.foreach(_.commit))(Keep.left).run()
+
+        case msg @ CommittableConsumerRecord(Person(name, age)) =>
+          for {
+            fooMessage <- fooService.foo(name, age)
+            _ = println(s"==> [Singleton - KafkaTestTopicMessageHandler] ==> from fooService: $fooMessage")
+            _ = println(s"==> [Singleton - KafkaTestTopicMessageHandler] ==> ${msg.record}, ${msg.offsets}")
+          } yield msg
+
+        case e =>
+          Future.successful(e)
+      }.toMat(Sink.foreach {
+        case end: EndBatch =>
+          end.commit
+          println(s"==> [Singleton - KafkaTestTopicMessageHandler] ==> batchSize: ${end.batchSize}")
+        case msg =>
+      })(Keep.left).run()
 }

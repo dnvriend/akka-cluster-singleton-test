@@ -29,19 +29,23 @@ import scalaz.Scalaz._
  * A Reactive Streams compatible Publisher that will emit CommittableConsumerRecords that can be committed eg. in the
  * Sink.foreach(_.commit)
  *
- * @param serializer       the serializer to use for deserializing the base types
- * @param initKafka        a callback function that will be applied with the ActorRef of the KafkaConsumerActorPublisher, and should return the ActorRef of the KafkaActorConsumer
+ * @param serializer the serializer to use for deserializing the base types
+ * @param initKafka  a callback function that will be applied with the ActorRef of the KafkaConsumerActorPublisher, and should return the ActorRef of the KafkaActorConsumer
  */
 class KafkaConsumerActorPublisher(
     serializer: Serializer,
     initKafka: ActorRef => ActorRef
-) extends ActorPublisher[CommittableConsumerRecord] with ActorLogging {
-  var buf: Option[CommittableConsumerRecord] = none[CommittableConsumerRecord]
+) extends ActorPublisher[KafkaConsumerProtocol] with ActorLogging {
+  var buf = Seq.empty[KafkaConsumerProtocol]
   val extractor: Extractor[Any, ConsumerRecords[String, Array[Byte]]] =
     ConsumerRecords.extractor[String, Array[Byte]]
   val kafkaConsumer: ActorRef = initKafka(self)
 
-  def automaticallyCommit(xs: Seq[Any]): Boolean = xs.exists {
+  /**
+   * Commit when the returned message has not been unmarshalled by the deserializer
+   * of the messag is not supported, else a manual commit must be done via CommittableConsumerRecord.commit
+   */
+  def unsupportedMessages(x: Any): Boolean = x match {
     case x: Array[Byte]     => true
     case UnsupportedMessage => true
     case _                  => false
@@ -49,15 +53,20 @@ class KafkaConsumerActorPublisher(
 
   override def receive: Receive = {
     case extractor(records) =>
-      val xs: Seq[AnyRef] = records.values.map(serializer.fromBinary)
-      log.debug("Received: {}", xs)
-      if (xs.isEmpty || automaticallyCommit(xs)) {
-        log.debug("Acking message: empty: {} or autoCommit: {}", xs.isEmpty, automaticallyCommit(xs))
-        kafkaConsumer ! KafkaConsumerActor.Confirm(records.offsets, commit = true)
-      } else {
-        buf = CommittableConsumerRecord(kafkaConsumer, records.offsets, xs.head).some
-        deliverBuf()
-      }
+      val xs: Seq[Any] = records
+        .values
+        .map(serializer.fromBinary)
+        .filterNot(unsupportedMessages)
+
+      val ys: Seq[KafkaConsumerProtocol] =
+        Seq(StartBatch(records.offsets, xs.length)) ++
+          xs.map(record => new CommittableConsumerRecord(kafkaConsumer, records.offsets, xs.length, record)).map(_.asInstanceOf[KafkaConsumerProtocol]) ++
+          Seq(new EndBatch(kafkaConsumer, records.offsets, xs.length))
+
+      buf = buf ++ ys
+
+      deliverBuf()
+
     case req: Request =>
       deliverBuf()
     case Cancel =>
@@ -92,8 +101,15 @@ class KafkaConsumerActorPublisher(
 
   final def deliverBuf(): Unit =
     if (totalDemand > 0) {
-      log.debug("==> deliverBuffer: demand: {}, buf: {}", totalDemand, buf)
-      buf.foreach(onNext)
-      buf = none[CommittableConsumerRecord]
+      if (totalDemand <= Int.MaxValue) {
+        val (use, keep) = buf.splitAt(totalDemand.toInt)
+        buf = keep
+        use foreach onNext
+      } else {
+        val (use, keep) = buf.splitAt(Int.MaxValue)
+        buf = keep
+        use foreach onNext
+        deliverBuf()
+      }
     }
 }
